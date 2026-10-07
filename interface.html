@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>J.A.R.V.I.S.</title>
+<!-- iPhone / iPad : « Ajouter à l'écran d'accueil » l'ouvre comme une vraie app, en plein écran -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<meta name="theme-color" content="#01060b">
+<link rel="apple-touch-icon" href="/icone.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --lenteur: 2;       /* vitesse de la séquence de démarrage (réglée aussi dans le script) */
+    --fond: #01060b;
+    --accent: #4fd8ff;
+    --accent-doux: rgba(79, 216, 255, .22);
+    --texte: #cfeefa;
+    --doux: #5f8798;
+    --hausse: #5cf2b0;
+    --baisse: #ff6b6b;
+    --panneau: rgba(6, 28, 42, .38);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(ellipse at 50% 46%, #06202e 0%, var(--fond) 62%), var(--fond);
+    color: var(--texte);
+    font-family: "Rajdhani", "Avenir Next", sans-serif;
+    cursor: default;
+    user-select: none;
+  }
+  canvas { position: fixed; inset: 0; }
+
+  /* vignette + lignes de balayage, pour l'effet "écran" */
+  .voile {
+    position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.65) 100%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px);
+  }
+
+  /* ---------- en-tête ---------- */
+  header {
+    position: fixed; top: 26px; left: 34px; right: 34px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .titre { font-family: "Orbitron", sans-serif; font-weight: 700; letter-spacing: .45em; font-size: 20px; color: var(--accent);
+           text-shadow: 0 0 18px rgba(79,216,255,.45); }
+  .sous-titre { margin-top: 6px; font-size: 12px; letter-spacing: .3em; color: var(--doux); text-transform: uppercase; }
+  .liaison { margin-top: 10px; font-family: "Share Tech Mono", monospace; font-size: 11px; color: var(--doux); letter-spacing: .12em; }
+  .liaison b { color: var(--hausse); font-weight: normal; }
+  .horloge { text-align: right; }
+  .heure { font-family: "Orbitron", sans-serif; font-size: 34px; letter-spacing: .06em; text-shadow: 0 0 16px rgba(79,216,255,.35); }
+  .heure small { font-size: 16px; color: var(--doux); margin-left: 4px; }
+  .date { margin-top: 4px; font-size: 13px; letter-spacing: .22em; color: var(--doux); text-transform: uppercase; }
+
+  /* ---------- panneaux ---------- */
+  .colonne { position: fixed; top: 50%; transform: translateY(-50%); width: 250px; display: flex; flex-direction: column; gap: 18px; }
+  .colonne.gauche { left: 34px; }
+  .colonne.droite { right: 34px; }
+  .panneau {
+    position: relative; padding: 14px 16px 15px;
+    background: var(--panneau);
+    border: 1px solid rgba(79,216,255,.12);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  /* coins lumineux */
+  .panneau::before, .panneau::after {
+    content: ""; position: absolute; width: 12px; height: 12px; border: 2px solid var(--accent);
+    filter: drop-shadow(0 0 4px var(--accent));
+  }
+  .panneau::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+  .panneau::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+  .panneau h2 {
+    font-family: "Orbitron", sans-serif; font-weight: 500; font-size: 10px; letter-spacing: .35em;
+    color: var(--accent); margin-bottom: 10px; display: flex; justify-content: space-between;
+  }
+  .panneau h2 span { color: var(--doux); letter-spacing: .1em; font-family: "Share Tech Mono", monospace; }
+  .vide { color: var(--doux); font-size: 13px; }
+
+  .meteo-temp { font-family: "Orbitron", sans-serif; font-size: 40px; line-height: 1; }
+  .meteo-temp sup { font-size: 18px; color: var(--accent); }
+  .meteo-ciel { margin-top: 6px; font-size: 16px; }
+  .meteo-ciel::first-letter { text-transform: uppercase; }
+  .meteo-details { margin-top: 6px; font-family: "Share Tech Mono", monospace; font-size: 12px; color: var(--doux); }
+
+  .colonne.droite { width: 340px; }
+  .ligne { display: grid; grid-template-columns: 74px 1fr auto 58px; gap: 8px; align-items: center; padding: 3px 4px;
+           border-bottom: 1px dashed rgba(79,216,255,.08); font-size: 15px; cursor: pointer;
+           transition: background .25s; }
+  .ligne:hover { background: rgba(79,216,255,.06); }
+  .ligne.choisie { background: rgba(79,216,255,.11); box-shadow: inset 2px 0 0 var(--accent); }
+  .ligne .val { text-align: right; }
+  .ligne canvas.mini { position: static; width: 100%; height: 18px; display: block; }
+
+  /* grand graphique 1 an */
+  .graphe h2 .nom-actif { color: var(--accent); letter-spacing: .3em; font-family: "Orbitron", sans-serif; }
+  .direct { display: inline-flex; align-items: center; gap: 6px; color: var(--hausse) !important; }
+  .direct i { width: 6px; height: 6px; border-radius: 50%; background: var(--hausse); box-shadow: 0 0 8px var(--hausse);
+              animation: clignote 1.2s ease-in-out infinite; }
+  .g-entete { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .g-entete b { font-family: "Orbitron", sans-serif; font-weight: 500; font-size: 22px; }
+  .g-entete span { font-family: "Share Tech Mono", monospace; font-size: 12px; }
+  canvas#graphe { position: static; width: 100%; height: 150px; display: block; cursor: crosshair; }
+  .g-pied { display: flex; justify-content: space-between; margin-top: 6px;
+            font-family: "Share Tech Mono", monospace; font-size: 10.5px; color: var(--doux); letter-spacing: .05em; }
+  .ligne:last-child { border-bottom: 0; }
+  .ligne .val { font-family: "Share Tech Mono", monospace; font-size: 13px; color: var(--texte); }
+  .ligne .var { font-family: "Share Tech Mono", monospace; font-size: 12px; width: 62px; text-align: right; }
+  .hausse { color: var(--hausse); }
+  .baisse { color: var(--baisse); }
+  .groupe { margin: 8px 0 2px; font-size: 10px; letter-spacing: .3em; color: var(--doux); }
+  .groupe:first-of-type { margin-top: 0; }
+
+  .emails { display: flex; gap: 12px; }
+  .email-bloc { flex: 1; text-align: center; padding: 6px 0; border: 1px solid rgba(79,216,255,.1); }
+  .email-bloc b { display: block; font-family: "Orbitron", sans-serif; font-size: 26px; font-weight: 500; }
+  .email-bloc small { font-size: 11px; letter-spacing: .25em; color: var(--doux); }
+
+  .diag { font-family: "Share Tech Mono", monospace; font-size: 11.5px; color: var(--doux); line-height: 1.7; }
+  .diag b { color: var(--texte); font-weight: normal; }
+
+  /* ---------- bas ---------- */
+  .bas {
+    position: fixed; left: 50%; bottom: 6vh; transform: translateX(-50%);
+    width: min(720px, calc(100% - 32px)); text-align: center;
+  }
+  .statut {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: "Orbitron", sans-serif; font-size: 12px; letter-spacing: .38em;
+    color: var(--accent); padding: 8px 20px;
+    border: 1px solid rgba(79,216,255,.25); border-radius: 999px; background: rgba(4,20,30,.4);
+    transition: color .4s, border-color .4s;
+  }
+  .statut i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor;
+              animation: clignote 1.6s ease-in-out infinite; }
+  .question { margin-top: 18px; font-size: 18px; color: var(--doux); min-height: 1.4em; }
+  .reponse  { margin-top: 8px; font-size: 22px; font-weight: 500; line-height: 1.35; min-height: 1.4em;
+              max-height: 4.2em; overflow: hidden; }
+  .question:empty, .reponse:empty { visibility: hidden; }
+
+  body.reflexion .statut { color: #ffb347; border-color: rgba(255,179,71,.35); }
+  body.hors-ligne .statut { color: var(--baisse); border-color: rgba(255,90,90,.35); }
+  body.veille .statut { color: #3f9fc2; }
+
+  /* touches T et M */
+  html[data-texte="off"] .question, html[data-texte="off"] .reponse { display: none; }
+  html[data-minimal="on"] header, html[data-minimal="on"] .bas, html[data-minimal="on"] .colonne { display: none; }
+
+  /* ---------- séquence de démarrage ---------- */
+  #demarrage {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: var(--fond); z-index: 10; pointer-events: none;
+    animation: disparition .8s ease-in 3.1s forwards;
+  }
+  #demarrage pre {
+    font-family: "Share Tech Mono", monospace; font-size: 14px; color: var(--accent); line-height: 2;
+    text-shadow: 0 0 10px rgba(79,216,255,.5);
+  }
+  #demarrage span { display: block; overflow: hidden; white-space: nowrap; width: 0;
+                    animation: frappe .5s steps(34) forwards; }
+  #demarrage span:nth-child(2) { animation-delay: .55s; }
+  #demarrage span:nth-child(3) { animation-delay: 1.1s; }
+  #demarrage span:nth-child(4) { animation-delay: 1.65s; }
+  #demarrage span:nth-child(5) { animation-delay: 2.2s; color: var(--texte); }
+
+  @keyframes frappe { to { width: 34ch; } }
+  @keyframes disparition { to { opacity: 0; visibility: hidden; } }
+  @keyframes apparition { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+  @keyframes apparition-droite { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+  @keyframes clignote { 50% { opacity: .35; } }
+
+  /* ---------- téléphone et petites tablettes : tout s'empile, on fait défiler ---------- */
+  @media (max-width: 1000px) {
+    html, body { overflow-y: auto; overflow-x: hidden; height: auto; min-height: 100%; }
+    body { display: flex; flex-direction: column; padding-bottom: max(30px, env(safe-area-inset-bottom)); }
+    header { position: relative; top: auto; left: auto; right: auto; order: 1;
+             padding: max(18px, env(safe-area-inset-top)) 16px 0; }
+    .titre { font-size: 15px; letter-spacing: .3em; }
+    .sous-titre, .liaison { font-size: 10px; }
+    .heure { font-size: 26px; }
+    .bas { position: relative; left: auto; bottom: auto; transform: none; width: auto; order: 2;
+           margin: 40vh 16px 18px; }
+    .reponse { font-size: 18px; max-height: none; }
+    .colonne { position: relative; top: auto; transform: none; display: flex; gap: 14px;
+               width: auto !important; left: auto !important; right: auto !important; margin: 0 16px; }
+    .colonne.droite { order: 3; margin-bottom: 14px; }
+    .colonne.gauche { order: 4; }
+  }
+  @media (prefers-reduced-motion: reduce) { #demarrage { display: none; } .projete { visibility: visible !important; animation: none !important; } }
+
+  /* ---------- projection holographique ---------- */
+  .projete { visibility: hidden; }
+  .projete.visible { visibility: visible; animation: projection calc(.9s * var(--lenteur)) ease-out both; }
+  @keyframes projection {
+    0%   { clip-path: inset(0 0 100% 0); opacity: .3; filter: brightness(2.6) saturate(1.4); }
+    55%  { clip-path: inset(0 0 0 0);    opacity: 1;  filter: brightness(1.7); }
+    64%  { opacity: .35; }
+    72%  { opacity: 1; }
+    80%  { opacity: .6; }
+    100% { clip-path: inset(0 0 0 0);    opacity: 1;  filter: none; }
+  }
+  .balayage {
+    position: absolute; left: -2px; right: -2px; height: 2px; top: 0; pointer-events: none; z-index: 2;
+    background: linear-gradient(90deg, transparent, #bff2ff, transparent);
+    box-shadow: 0 0 14px 3px rgba(79,216,255,.8);
+    animation: balayage calc(.5s * var(--lenteur)) ease-in forwards;
+  }
+  @keyframes balayage { from { top: 0; opacity: 1; } 85% { opacity: 1; } to { top: 100%; opacity: 0; } }
+  .ligne.entree { animation: ligne-entree calc(.45s * var(--lenteur)) ease-out both; }
+  @keyframes ligne-entree { from { opacity: 0; transform: translateX(14px); filter: brightness(2.5); } to { opacity: 1; transform: none; filter: none; } }
+  #faisceaux { z-index: 5; pointer-events: none; }
+</style>
+</head>
+<body class="veille">
+<canvas id="scene"></canvas>
+<canvas id="faisceaux"></canvas>
+<div class="voile"></div>
+
+<div id="demarrage"><pre><span>&gt; INITIALISATION DU NOYAU......  OK</span><span>&gt; LIAISON VOCALE...............  OK</span><span>&gt; MODULES : MÉTÉO · MARCHÉS · MAIL</span><span>&gt; CHIFFREMENT LOCAL.............  OK</span><span>&gt; BONJOUR, MONSIEUR.</span></pre></div>
+
+<header class="projete" id="p-entete">
+  <div>
+    <div class="titre">J.A.R.V.I.S.</div>
+    <div class="sous-titre">Assistant personnel · Rémi</div>
+    <div class="liaison">LIAISON <b>●</b> SÉCURISÉE · LOCALE</div>
+  </div>
+  <div class="horloge">
+    <div class="heure"><span id="heure">--:--</span><small id="secondes">00</small></div>
+    <div class="date" id="date"></div>
+  </div>
+</header>
+
+<div class="colonne gauche">
+  <section class="panneau projete" id="p-meteo">
+    <h2>MÉTÉO <span id="meteo-ville">—</span></h2>
+    <div id="meteo"><div class="vide">Acquisition…</div></div>
+  </section>
+  <section class="panneau projete" id="p-mail">
+    <h2>MESSAGERIE <span>NON LUS</span></h2>
+    <div id="emails"><div class="vide">Acquisition…</div></div>
+  </section>
+  <section class="panneau projete" id="p-diag">
+    <h2>DIAGNOSTIC</h2>
+    <div class="diag">
+      ÉTAT ........ <b id="diag-etat">VEILLE</b><br>
+      SESSION ..... <b id="diag-session">00:00:00</b><br>
+      DONNÉES ..... <b id="diag-maj">—</b>
+    </div>
+  </section>
+</div>
+
+<div class="colonne droite">
+  <section class="panneau projete" id="p-marches">
+    <h2>MARCHÉS <span>1 AN · JOUR</span></h2>
+    <div id="marches"><div class="vide">Acquisition…</div></div>
+  </section>
+  <section class="panneau graphe projete" id="p-graphe">
+    <h2><span class="nom-actif" id="g-nom">GRAPHIQUE 1 AN</span><span class="direct"><i></i>DIRECT</span></h2>
+    <div class="g-entete"><b id="g-valeur">—</b><span id="g-perf"></span></div>
+    <canvas id="graphe"></canvas>
+    <div class="g-pied"><span>CLIC SUR UNE LIGNE · ← →</span><span id="g-maj"></span></div>
+  </section>
+</div>
+
+<div class="bas projete" id="p-bas">
+  <div class="statut"><i></i><span id="statut">EN VEILLE</span></div>
+  <div class="question" id="question"></div>
+  <div class="reponse" id="reponse"></div>
+</div>
+
+<script>
+// =====================================================================
+// RÉGLAGE : vitesse de la séquence de démarrage
+// LENTEUR : 1 = rapide, 2 = posé (par défaut), 3 = très cinématographique
+const LENTEUR = 2;
+document.documentElement.style.setProperty("--lenteur", LENTEUR);
+
+// Position de l'orbe : au centre sur grand écran, en haut sur téléphone
+function centreOrbe() {
+  const petit = innerWidth <= 1000;
+  return {
+    cx: innerWidth / 2,
+    cy: innerHeight * (petit ? 0.3 : 0.46),
+    R: Math.min(innerWidth, innerHeight) * (petit ? 0.2 : 0.15)
+  };
+}
+// =====================================================================
+// 1. ÉTAT DE JARVIS (demandé à Python 20 fois par seconde)
+// =====================================================================
+let etat = { etat: "veille", question: "", reponse: "", niveau: 0, env_id: 0 };
+let enveloppe = { id: 0, t0: 0, fps: 30, valeurs: [] };
+const LIBELLES = { "veille": "EN VEILLE", "ecoute": "J'ÉCOUTE", "reflexion": "ANALYSE",
+                   "parole": "RÉPONSE", "hors-ligne": "HORS LIGNE" };
+
+async function interroger() {
+  try {
+    const r = await fetch("/etat", { cache: "no-store" });
+    etat = await r.json();
+    if (etat.env_id !== enveloppe.id) {          // nouvelle phrase : on récupère son rythme
+      const e = await fetch("/enveloppe", { cache: "no-store" });
+      enveloppe = await e.json();
+    }
+  } catch (e) {
+    etat = { ...etat, etat: "hors-ligne", niveau: 0 };
+  }
+  document.body.className = etat.etat;
+  document.getElementById("statut").textContent = LIBELLES[etat.etat] || etat.etat;
+  document.getElementById("diag-etat").textContent = LIBELLES[etat.etat] || etat.etat;
+  document.getElementById("question").textContent = etat.question ? "« " + etat.question + " »" : "";
+  document.getElementById("reponse").textContent = etat.reponse || "";
+  setTimeout(interroger, 50);
+}
+interroger();
+
+// =====================================================================
+// 2. PANNEAUX (météo, marchés, emails) — toutes les 30 secondes
+// =====================================================================
+function echapper(t) {
+  return String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+async function chargerDonnees() {
+  try {
+    const d = await (await fetch("/donnees", { cache: "no-store" })).json();
+    if (d.meteo) {
+      const m = d.meteo;
+      document.getElementById("meteo-ville").textContent = m.ville.toUpperCase();
+      document.getElementById("meteo").innerHTML =
+        `<div class="meteo-temp"><span data-compte="${m.temperature}">${m.temperature}</span><sup>°C</sup></div>
+         <div class="meteo-ciel">${echapper(m.ciel)}</div>
+         <div class="meteo-details">MIN ${m.min}° · MAX ${m.max}° · PLUIE ${m.pluie}%</div>`;
+    }
+    if (d.marches && d.marches.length) {
+      marches = d.marches;
+      if (choix >= marches.length) choix = 0;
+      afficherMarches();
+      if (d.maj_marches) document.getElementById("g-maj").textContent = "MAJ " + d.maj_marches;
+    }
+    const comptes = Object.entries(d.emails || {});
+    if (comptes.length) {
+      document.getElementById("emails").innerHTML = '<div class="emails">' +
+        comptes.map(([nom, n]) => `<div class="email-bloc"><b data-compte="${n}">${n}</b><small>${echapper(nom.toUpperCase())}</small></div>`).join("") +
+        "</div>";
+    }
+    if (d.maj) document.getElementById("diag-maj").textContent = d.maj;
+  } catch (e) { /* Jarvis éteint : on garde l'affichage */ }
+  setTimeout(chargerDonnees, 20000);
+}
+setTimeout(chargerDonnees, 1500);
+
+// =====================================================================
+// 2 bis. MARCHÉS : lignes avec mini-courbes + grand graphique 1 an
+// =====================================================================
+let marches = [], choix = 0, manuelJusqua = 0, debutTransition = performance.now(), survol = null;
+const MOIS = ["JANV", "FÉVR", "MARS", "AVR", "MAI", "JUIN", "JUIL", "AOÛT", "SEPT", "OCT", "NOV", "DÉC"];
+
+function formater(v) {
+  if (v >= 1000) return v.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+  if (v >= 1) return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v.toLocaleString("fr-FR", { maximumSignificantDigits: 4 });
+}
+
+function afficherMarches() {
+  let html = "", groupe = "";
+  marches.forEach((c, i) => {
+    if (c.type !== groupe) {
+      groupe = c.type;
+      html += `<div class="groupe">${groupe === "indice" ? "INDICES" : "CRYPTOS"}</div>`;
+    }
+    const sens = c.variation >= 0 ? "hausse" : "baisse";
+    html += `<div class="ligne${i === choix ? " choisie" : ""}" data-i="${i}">
+               <span>${echapper(c.nom)}</span>
+               <canvas class="mini" data-i="${i}"></canvas>
+               <span class="val">${echapper(c.valeur)}</span>
+               <span class="var ${sens}">${c.variation >= 0 ? "▲" : "▼"} ${Math.abs(c.variation).toFixed(1)}%</span>
+             </div>`;
+  });
+  const zone = document.getElementById("marches");
+  zone.innerHTML = html;
+  if (!marchesAnimes && document.getElementById("p-marches").classList.contains("visible")) animerLignes();
+  zone.querySelectorAll("canvas.mini").forEach(cv => miniCourbe(cv, marches[+cv.dataset.i]));
+  zone.querySelectorAll(".ligne").forEach(l => l.addEventListener("click", () => choisir(+l.dataset.i, true)));
+  majEntete();
+}
+
+function miniCourbe(cv, c) {
+  const d = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * d; cv.height = h * d;
+  const x = cv.getContext("2d"); x.scale(d, d);
+  const s = c.serie || [];
+  if (s.length < 2) return;
+  const mn = Math.min(...s), mx = Math.max(...s), et = (mx - mn) || 1;
+  x.strokeStyle = c.variation_1an >= 0 ? "#5cf2b0" : "#ff6b6b";
+  x.lineWidth = 1.2; x.globalAlpha = 0.85;
+  x.beginPath();
+  s.forEach((v, i) => {
+    const px = i / (s.length - 1) * (w - 3), py = h - 2 - (v - mn) / et * (h - 4);
+    i ? x.lineTo(px, py) : x.moveTo(px, py);
+  });
+  x.stroke();
+  x.fillStyle = x.strokeStyle;
+  x.beginPath(); x.arc(w - 3, h - 2 - (s[s.length - 1] - mn) / et * (h - 4), 1.8, 0, Math.PI * 2); x.fill();
+}
+
+function choisir(i, manuel) {
+  if (!marches.length) return;
+  choix = (i + marches.length) % marches.length;
+  debutTransition = performance.now();
+  if (manuel) manuelJusqua = Date.now() + 60000;     // après un clic, pas de défilement pendant 1 min
+  document.querySelectorAll("#marches .ligne").forEach(l => l.classList.toggle("choisie", +l.dataset.i === choix));
+  majEntete();
+}
+
+function majEntete() {
+  const c = marches[choix];
+  if (!c) return;
+  document.getElementById("g-nom").textContent = c.nom.toUpperCase() + " · 1 AN";
+  document.getElementById("g-valeur").textContent = formater(c.dernier) + (c.type === "crypto" ? " $" : " pts");
+  const perf = document.getElementById("g-perf");
+  perf.className = c.variation_1an >= 0 ? "hausse" : "baisse";
+  perf.textContent = `${c.variation_1an >= 0 ? "▲" : "▼"} ${Math.abs(c.variation_1an).toFixed(1)}% SUR 1 AN`;
+}
+
+// défilement automatique d'un actif à l'autre toutes les 12 s
+setInterval(() => { if (Date.now() > manuelJusqua) choisir(choix + 1, false); }, 12000);
+addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") choisir(choix + 1, true);
+  if (e.key === "ArrowLeft") choisir(choix - 1, true);
+});
+
+// survol du graphique : réticule avec date et valeur
+const graphe = document.getElementById("graphe");
+graphe.addEventListener("mousemove", e => { const r = graphe.getBoundingClientRect(); survol = e.clientX - r.left; });
+graphe.addEventListener("mouseleave", () => { survol = null; });
+// au doigt (téléphone, iPad) : glisser sur la courbe
+graphe.addEventListener("touchmove", e => {
+  const r = graphe.getBoundingClientRect(); survol = e.touches[0].clientX - r.left; e.preventDefault();
+}, { passive: false });
+graphe.addEventListener("touchend", () => { survol = null; });
+
+function dessinerGraphe(maintenant) {
+  const c = marches[choix];
+  const d = window.devicePixelRatio || 1, w = graphe.clientWidth, h = graphe.clientHeight;
+  if (graphe.width !== Math.round(w * d) || graphe.height !== Math.round(h * d)) { graphe.width = w * d; graphe.height = h * d; }
+  const x = graphe.getContext("2d");
+  x.setTransform(d, 0, 0, d, 0, 0);
+  x.clearRect(0, 0, w, h);
+  if (!c || !c.serie || c.serie.length < 2) return;
+
+  const s = c.serie, n = s.length;
+  const G = 2, D = 50, H = 8, B = 16;                    // marges : gauche, droite, haut, bas
+  const lw = w - G - D, lh = h - H - B;
+  let mn = Math.min(...s), mx = Math.max(...s);
+  const marge = (mx - mn) * 0.08 || mx * 0.01; mn -= marge; mx += marge;
+  const X = i => G + i / (n - 1) * lw;
+  const Y = v => H + (1 - (v - mn) / (mx - mn)) * lh;
+  const p = Math.min(1, (maintenant - debutTransition) / (900 * LENTEUR)), ease = 1 - Math.pow(1 - p, 3);
+  const nVisibles = Math.max(2, Math.floor(n * ease));
+
+  // grille et valeurs
+  x.font = '10px "Share Tech Mono", monospace';
+  x.textBaseline = "middle"; x.textAlign = "left";
+  for (let k = 0; k <= 3; k++) {
+    const v = mn + (mx - mn) * k / 3, y = Y(v);
+    x.strokeStyle = "rgba(79,216,255,.08)"; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(G, y); x.lineTo(G + lw, y); x.stroke();
+    x.fillStyle = "rgba(95,135,152,.9)"; x.fillText(formater(v), G + lw + 6, y);
+  }
+  // mois en bas
+  x.textAlign = "center"; x.textBaseline = "alphabetic";
+  let dernierX = -99;
+  for (let i = 1; i < n; i++) {
+    if (c.dates[i].slice(5, 7) !== c.dates[i - 1].slice(5, 7)) {
+      const px = X(i);
+      if (px - dernierX < 30) continue;
+      dernierX = px;
+      x.strokeStyle = "rgba(79,216,255,.06)";
+      x.beginPath(); x.moveTo(px, H); x.lineTo(px, H + lh); x.stroke();
+      x.fillStyle = "rgba(95,135,152,.8)";
+      x.fillText(MOIS[+c.dates[i].slice(5, 7) - 1], px, h - 3);
+    }
+  }
+  // aire sous la courbe
+  const grad = x.createLinearGradient(0, H, 0, H + lh);
+  grad.addColorStop(0, "rgba(79,216,255,.28)"); grad.addColorStop(1, "rgba(79,216,255,0)");
+  x.beginPath(); x.moveTo(X(0), H + lh);
+  for (let i = 0; i < nVisibles; i++) x.lineTo(X(i), Y(s[i]));
+  x.lineTo(X(nVisibles - 1), H + lh); x.closePath();
+  x.fillStyle = grad; x.fill();
+  // courbe lumineuse
+  x.beginPath();
+  for (let i = 0; i < nVisibles; i++) i ? x.lineTo(X(i), Y(s[i])) : x.moveTo(X(i), Y(s[i]));
+  x.strokeStyle = "#4fd8ff"; x.lineWidth = 1.6;
+  x.shadowColor = "#4fd8ff"; x.shadowBlur = 8; x.stroke(); x.shadowBlur = 0;
+
+  // point "en direct" qui pulse
+  if (ease >= 1) {
+    const lx = X(n - 1), ly = Y(s[n - 1]), phase = (maintenant / 1400) % 1;
+    x.strokeStyle = `rgba(92,242,176,${1 - phase})`; x.lineWidth = 1.5;
+    x.beginPath(); x.arc(lx, ly, 3 + phase * 9, 0, Math.PI * 2); x.stroke();
+    x.fillStyle = "#5cf2b0"; x.beginPath(); x.arc(lx, ly, 3, 0, Math.PI * 2); x.fill();
+  }
+
+  // réticule au survol
+  if (survol !== null && survol >= G && survol <= G + lw) {
+    const i = Math.round((survol - G) / lw * (n - 1)), px = X(i), py = Y(s[i]);
+    x.strokeStyle = "rgba(207,238,250,.35)"; x.setLineDash([3, 3]);
+    x.beginPath(); x.moveTo(px, H); x.lineTo(px, H + lh); x.moveTo(G, py); x.lineTo(G + lw, py); x.stroke();
+    x.setLineDash([]);
+    x.fillStyle = "#cfeefa"; x.beginPath(); x.arc(px, py, 3, 0, Math.PI * 2); x.fill();
+    const [a, m, j] = c.dates[i].split("-");
+    const etiquette = `${+j} ${MOIS[+m - 1]} ${a} · ${formater(s[i])}`;
+    x.font = '11px "Share Tech Mono", monospace';
+    const tw = x.measureText(etiquette).width + 12;
+    const bx = Math.min(Math.max(px - tw / 2, G), G + lw - tw);
+    x.fillStyle = "rgba(2,14,22,.92)"; x.fillRect(bx, H, tw, 18);
+    x.strokeStyle = "rgba(79,216,255,.4)"; x.strokeRect(bx + .5, H + .5, tw - 1, 17);
+    x.fillStyle = "#cfeefa"; x.textAlign = "left"; x.textBaseline = "middle";
+    x.fillText(etiquette, bx + 6, H + 9);
+  }
+}
+(function boucleGraphe(t) { dessinerGraphe(t); requestAnimationFrame(boucleGraphe); })(performance.now());
+
+// =====================================================================
+// 3. HORLOGE ET DURÉE DE SESSION
+// =====================================================================
+const debutSession = Date.now();
+function horloge() {
+  const d = new Date();
+  document.getElementById("heure").textContent = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  document.getElementById("secondes").textContent = String(d.getSeconds()).padStart(2, "0");
+  document.getElementById("date").textContent = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  const s = Math.floor((Date.now() - debutSession) / 1000);
+  document.getElementById("diag-session").textContent =
+    [s / 3600, (s % 3600) / 60, s % 60].map(x => String(Math.floor(x)).padStart(2, "0")).join(":");
+}
+horloge(); setInterval(horloge, 1000);
+
+// =====================================================================
+// 4. TOUCHES : T = texte, M = mode minimal, F = plein écran
+// =====================================================================
+function lireReglage(cle, defaut) { try { return localStorage.getItem(cle) || defaut; } catch (e) { return defaut; } }
+function ecrireReglage(cle, valeur) { try { localStorage.setItem(cle, valeur); } catch (e) {} }
+const racine = document.documentElement;
+racine.dataset.texte = lireReglage("jarvis-texte", "off");
+racine.dataset.minimal = lireReglage("jarvis-minimal", "off");
+addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (k === "t") { racine.dataset.texte = racine.dataset.texte === "off" ? "on" : "off"; ecrireReglage("jarvis-texte", racine.dataset.texte); }
+  if (k === "m") { racine.dataset.minimal = racine.dataset.minimal === "on" ? "off" : "on"; ecrireReglage("jarvis-minimal", racine.dataset.minimal); }
+  if (k === "f" && racine.requestFullscreen) { document.fullscreenElement ? document.exitFullscreen() : racine.requestFullscreen().catch(() => {}); }
+});
+
+// =====================================================================
+// 4 bis. SÉQUENCE DE PROJECTION AU DÉMARRAGE
+//   Chaque élément est "projeté" depuis l'orbe, l'un après l'autre :
+//   un faisceau part du centre, puis le panneau se matérialise.
+// =====================================================================
+const reduit = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const DEBUT_ORBE = reduit ? 0 : 3300;            // l'orbe se déploie après le texte d'initialisation
+const ORDRE = ["p-entete", "p-meteo", "p-mail", "p-marches", "p-graphe", "p-diag", "p-bas"];
+const SEQUENCE = ORDRE.map((id, i) => [id, 4300 + i * 800 * LENTEUR]);   // [élément, moment en ms]
+const DUREE_FAISCEAU = 330 * LENTEUR;
+const DUREE_FONDU = 700 * LENTEUR;
+let marchesAnimes = false;
+const faisceaux = [];
+const toileF = document.getElementById("faisceaux");
+const fctx = toileF.getContext("2d");
+
+function compter(el) {                           // les chiffres défilent jusqu'à leur valeur
+  const cible = parseFloat(el.dataset.compte);
+  if (isNaN(cible)) return;
+  const t0 = performance.now();
+  (function pas(t) {
+    const p = Math.min(1, (t - t0) / (900 * LENTEUR)), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(cible * e);
+    if (p < 1) requestAnimationFrame(pas);
+  })(t0);
+}
+
+function animerLignes() {                        // les lignes des marchés arrivent une à une
+  marchesAnimes = true;
+  document.querySelectorAll("#marches .ligne").forEach((l, i) => {
+    l.style.animationDelay = (i * 70 * LENTEUR) + "ms";
+    l.classList.add("entree");
+  });
+}
+
+function projeter(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const { cx, cy } = centreOrbe();
+  if (r.width > 0) {                             // point d'arrivée : le bord le plus proche de l'orbe
+    let x2, y2;
+    if (r.right < cx)       { x2 = r.right;            y2 = r.top + r.height / 2; }
+    else if (r.left > cx)   { x2 = r.left;             y2 = r.top + r.height / 2; }
+    else if (r.bottom < cy) { x2 = r.left + r.width / 2; y2 = r.bottom; }
+    else                    { x2 = r.left + r.width / 2; y2 = r.top; }
+    faisceaux.push({ x2, y2, r, t0: performance.now() });
+  }
+  setTimeout(() => {
+    el.classList.add("visible");
+    if (el.classList.contains("panneau")) {
+      const b = document.createElement("div");
+      b.className = "balayage";
+      el.appendChild(b);
+      setTimeout(() => b.remove(), 650 * LENTEUR);
+    }
+    el.querySelectorAll("[data-compte]").forEach(compter);
+    if (id === "p-marches" && !marchesAnimes) animerLignes();
+    if (id === "p-graphe") debutTransition = performance.now();
+  }, DUREE_FAISCEAU);
+}
+
+function dessinerFaisceaux(t) {
+  const d = window.devicePixelRatio || 1;
+  if (toileF.width !== Math.round(innerWidth * d) || toileF.height !== Math.round(innerHeight * d)) {
+    toileF.width = innerWidth * d; toileF.height = innerHeight * d;
+    toileF.style.width = innerWidth + "px"; toileF.style.height = innerHeight + "px";
+  }
+  fctx.setTransform(d, 0, 0, d, 0, 0);
+  fctx.clearRect(0, 0, innerWidth, innerHeight);
+  const { cx, cy } = centreOrbe();
+  for (const f of faisceaux) {
+    const age = t - f.t0;
+    if (age < 0 || age > DUREE_FAISCEAU + DUREE_FONDU) continue;
+    const p = Math.min(1, age / DUREE_FAISCEAU);
+    const fondu = age < DUREE_FAISCEAU ? 1 : Math.max(0, 1 - (age - DUREE_FAISCEAU) / DUREE_FONDU);
+    const x = cx + (f.x2 - cx) * p, y = cy + (f.y2 - cy) * p;
+    // le faisceau
+    const g = fctx.createLinearGradient(cx, cy, x, y);
+    g.addColorStop(0, "rgba(79,216,255,0)");
+    g.addColorStop(1, `rgba(191,242,255,${0.95 * fondu})`);
+    fctx.strokeStyle = g; fctx.lineWidth = 2;
+    fctx.shadowColor = "#4fd8ff"; fctx.shadowBlur = 16;
+    fctx.beginPath(); fctx.moveTo(cx, cy); fctx.lineTo(x, y); fctx.stroke();
+    // sa tête lumineuse
+    fctx.fillStyle = `rgba(255,255,255,${fondu})`;
+    fctx.beginPath(); fctx.arc(x, y, 3.2, 0, Math.PI * 2); fctx.fill();
+    // à l'arrivée : un cadre lumineux qui s'élargit autour du panneau
+    if (age >= DUREE_FAISCEAU) {
+      const marge = 3 + (age - DUREE_FAISCEAU) / DUREE_FONDU * 12;
+      fctx.strokeStyle = `rgba(79,216,255,${0.85 * fondu})`; fctx.lineWidth = 1;
+      fctx.strokeRect(f.r.left - marge, f.r.top - marge, f.r.width + 2 * marge, f.r.height + 2 * marge);
+    }
+    fctx.shadowBlur = 0;
+  }
+  requestAnimationFrame(dessinerFaisceaux);
+}
+
+if (reduit) {
+  SEQUENCE.forEach(([id]) => document.getElementById(id).classList.add("visible"));
+} else {
+  SEQUENCE.forEach(([id, moment]) => setTimeout(() => projeter(id), moment));
+  requestAnimationFrame(dessinerFaisceaux);
+}
+
+// Filet de sécurité : si la fenêtre n'est pas en plein écran,
+// le premier clic ou la première touche l'y met (les navigateurs exigent un geste de ta part)
+function pleinEcranAuPremierGeste() {
+  if (!document.fullscreenElement && innerHeight < screen.height - 40) {
+    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  }
+}
+addEventListener("click", pleinEcranAuPremierGeste, { once: true });
+addEventListener("keydown", e => { if (e.key.toLowerCase() !== "f") pleinEcranAuPremierGeste(); }, { once: true });
+
+// =====================================================================
+// 5. LA SCÈNE ANIMÉE
+// =====================================================================
+const toile = document.getElementById("scene");
+const ctx = toile.getContext("2d");
+let W = 0, H = 0, grille = null;
+
+function redimensionner() {
+  const d = window.devicePixelRatio || 1;
+  W = innerWidth; H = innerHeight;
+  toile.width = W * d; toile.height = H * d;
+  toile.style.width = W + "px"; toile.style.height = H + "px";
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  grille = dessinerGrille(d);
+}
+
+// Grille hexagonale, dessinée une seule fois puis réutilisée
+function dessinerGrille(d) {
+  const g = document.createElement("canvas");
+  g.width = W * d; g.height = H * d;
+  const c = g.getContext("2d");
+  c.scale(d, d);
+  c.strokeStyle = "rgba(79,216,255,0.055)";
+  c.lineWidth = 1;
+  const r = 22, h = Math.sqrt(3) * r;
+  for (let y = -h; y < H + h; y += h) {
+    for (let x = -r * 3, i = 0; x < W + r * 3; x += r * 1.5, i++) {
+      const yy = y + (i % 2 ? h / 2 : 0);
+      c.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const a = Math.PI / 3 * k;
+        c.lineTo(x + r * Math.cos(a), yy + r * Math.sin(a));
+      }
+      c.closePath(); c.stroke();
+    }
+  }
+  return g;
+}
+addEventListener("resize", redimensionner);
+redimensionner();
+
+// Particules en profondeur (effet de voyage dans l'espace)
+const particules = Array.from({ length: 240 }, () => nouvelleParticule(true));
+function nouvelleParticule(auHasard) {
+  return { x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: auHasard ? Math.random() : 1 };
+}
+
+// Réglages par état : couleur, vitesse des anneaux, vitesse des particules
+const PROFILS = {
+  "veille":     { c: [40, 140, 185], v: 0.25, p: 0.025 },
+  "ecoute":     { c: [79, 216, 255], v: 0.7,  p: 0.06 },
+  "reflexion":  { c: [255, 179, 71], v: 2.2,  p: 0.22 },
+  "parole":     { c: [79, 216, 255], v: 0.55, p: 0.08 },
+  "hors-ligne": { c: [255, 90, 90],  v: 0.06, p: 0.01 }
+};
+const actuel = { c: [40, 140, 185], v: 0.25, p: 0.025 };
+let angle = 0, niveauLisse = 0, precedent = performance.now();
+const debutAnim = performance.now() + DEBUT_ORBE;
+
+// Le niveau sonore à afficher (0 à 1)
+function niveauCible(t) {
+  if (etat.etat === "parole" && enveloppe.valeurs.length) {
+    const i = Math.floor((Date.now() - enveloppe.t0) / 1000 * enveloppe.fps);
+    return i >= 0 && i < enveloppe.valeurs.length ? enveloppe.valeurs[i] : 0.05;
+  }
+  if (etat.etat === "ecoute") return Math.min(1, (etat.niveau || 0) * 1.4);
+  if (etat.etat === "reflexion") return 0.28 + 0.1 * Math.sin(t * 5);
+  if (etat.etat === "hors-ligne") return 0.02;
+  return 0.07 + 0.05 * Math.sin(t * 1.3);   // veille : respiration
+}
+
+function image(maintenant) {
+  const dt = Math.max(0, Math.min(0.05, (maintenant - precedent) / 1000));
+  precedent = maintenant;
+  const t = maintenant / 1000;
+  const boot = Math.max(0, Math.min(1, (maintenant - debutAnim) / 2600));   // séquence d'apparition
+  const ease = 1 - Math.pow(1 - boot, 3);
+
+  const p = PROFILS[etat.etat] || PROFILS.veille;
+  for (let i = 0; i < 3; i++) actuel.c[i] += (p.c[i] - actuel.c[i]) * 0.06;
+  actuel.v += (p.v - actuel.v) * 0.05;
+  actuel.p += (p.p - actuel.p) * 0.05;
+  angle += actuel.v * dt;
+
+  const cible = niveauCible(t);
+  niveauLisse += (cible - niveauLisse) * (cible > niveauLisse ? 0.45 : 0.12);
+  const L = Math.max(0, Math.min(1, niveauLisse));
+
+  const { cx, cy, R } = centreOrbe();
+  const rgb = actuel.c.map(Math.round).join(",");
+  const coul = a => `rgba(${rgb},${a})`;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 0.9 * ease;
+  ctx.drawImage(grille, 0, 0, W, H);
+  ctx.globalAlpha = 1;
+
+  // --- particules ---
+  ctx.globalCompositeOperation = "lighter";
+  for (const q of particules) {
+    q.z -= actuel.p * dt * (1 + L * 2);
+    const px = cx + (q.x / q.z) * W * 0.3, py = cy + (q.y / q.z) * H * 0.3;
+    if (q.z <= 0.03 || px < -20 || px > W + 20 || py < -20 || py > H + 20) { Object.assign(q, nouvelleParticule(false)); continue; }
+    const taille = (1 - q.z) * 2.2;
+    ctx.fillStyle = coul((1 - q.z) * 0.7 * ease);
+    ctx.fillRect(px, py, taille, taille);
+  }
+
+  // --- halo ---
+  let g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2.8);
+  g.addColorStop(0, coul((0.18 + 0.35 * L) * ease));
+  g.addColorStop(0.45, coul(0.05 + 0.08 * L));
+  g.addColorStop(1, coul(0));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  // --- cœur ---
+  const rc = R * (0.36 + 0.14 * L) * ease;
+  g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rc);
+  g.addColorStop(0, `rgba(255,255,255,${0.75 + 0.25 * L})`);
+  g.addColorStop(0.3, coul(0.95));
+  g.addColorStop(1, coul(0));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, rc, 0, Math.PI * 2); ctx.fill();
+
+  // --- onde circulaire : se déforme avec le son ---
+  for (let k = 0; k < 3; k++) {
+    ctx.beginPath();
+    for (let i = 0; i <= 180; i++) {
+      const a = i / 180 * Math.PI * 2;
+      const def = Math.sin(3 * a + t * 2.1 + k * 2) * 0.5 + Math.sin(5 * a - t * 1.4 + k) * 0.3
+                + Math.sin(9 * a + t * 3.3 + k * 4) * 0.2;
+      const r = R * (0.6 + 0.012 * Math.sin(t * 2 + k)) + def * L * R * 0.2;
+      const x = cx + Math.cos(a) * r * ease, y = cy + Math.sin(a) * r * ease;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = coul(0.35 + 0.35 * L); ctx.lineWidth = 1.4; ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.lineCap = "round";
+
+  // --- anneaux segmentés qui tournent (s'ouvrent au démarrage) ---
+  const anneaux = [[0.8, 1, 3, 2.6], [0.95, -0.6, 5, 1.4], [1.1, 0.35, 2, 1]];
+  for (const [r, vit, seg, ep] of anneaux) {
+    ctx.strokeStyle = coul(0.45 + 0.3 * L); ctx.lineWidth = ep;
+    for (let s = 0; s < seg; s++) {
+      const a0 = angle * vit + s * 2 * Math.PI / seg;
+      ctx.beginPath(); ctx.arc(cx, cy, R * r, a0, a0 + (2 * Math.PI / seg) * 0.62 * ease); ctx.stroke();
+    }
+  }
+
+  // --- graduations : un "spectre" circulaire qui suit le son ---
+  for (let i = 0; i < 120; i++) {
+    const a = i / 120 * Math.PI * 2 - angle * 0.15;
+    const bruit = Math.abs(Math.sin(t * 6.3 + i * 0.83) * Math.sin(t * 2.9 + i * 0.31));
+    const l = R * (0.03 + L * 0.26 * bruit);
+    const r0 = R * 1.24;
+    ctx.strokeStyle = coul(i % 10 === 0 ? 0.9 : 0.35);
+    ctx.lineWidth = i % 10 === 0 ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+    ctx.lineTo(cx + Math.cos(a) * (r0 + l * ease), cy + Math.sin(a) * (r0 + l * ease));
+    ctx.stroke();
+  }
+
+  // --- cercle extérieur en pointillés + balayage radar ---
+  const rExt = R * 1.62;
+  ctx.setLineDash([2, 7]);
+  ctx.strokeStyle = coul(0.35); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, rExt, 0, Math.PI * 2 * ease); ctx.stroke();
+  ctx.setLineDash([]);
+  if (ctx.createConicGradient) {
+    const balayage = t * (etat.etat === "reflexion" ? 2.4 : 0.7);
+    const cg = ctx.createConicGradient(balayage, cx, cy);
+    cg.addColorStop(0, coul(0.22 * ease));
+    cg.addColorStop(0.12, coul(0));
+    cg.addColorStop(1, coul(0));
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(cx, cy, rExt, 0, Math.PI * 2); ctx.arc(cx, cy, R * 1.24, 0, Math.PI * 2, true); ctx.fill();
+  }
+
+  // --- repères en degrés qui tournent lentement ---
+  ctx.font = '10px "Share Tech Mono", monospace';
+  ctx.fillStyle = coul(0.55 * ease);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (let deg = 0; deg < 360; deg += 30) {
+    const a = deg * Math.PI / 180 - angle * 0.08;
+    ctx.fillText(String(deg).padStart(3, "0"), cx + Math.cos(a) * R * 1.78, cy + Math.sin(a) * R * 1.78);
+  }
+
+  // --- réflexion : satellites en orbite ---
+  if (etat.etat === "reflexion") {
+    for (let i = 0; i < 3; i++) {
+      const a = t * 3.2 + i * 2.094;
+      ctx.fillStyle = coul(1);
+      ctx.shadowColor = coul(1); ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R * 0.95, cy + Math.sin(a) * R * 0.95, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  // --- croix de visée discrète ---
+  ctx.strokeStyle = coul(0.18); ctx.lineWidth = 1;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + dx * R * 1.9, cy + dy * R * 1.9);
+    ctx.lineTo(cx + dx * R * 2.3, cy + dy * R * 2.3);
+    ctx.stroke();
+  }
+
+  requestAnimationFrame(image);
+}
+requestAnimationFrame(image);
+</script>
+</body>
+</html>

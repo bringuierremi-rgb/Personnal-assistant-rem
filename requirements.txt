@@ -1,0 +1,11 @@
+sounddevice              # accès au micro et aux haut-parleurs
+numpy                    # calculs sur le son
+openwakeword             # détection de "Hey Jarvis"
+onnxruntime              # moteur qui fait tourner le modèle de détection
+faster-whisper           # transcription voix -> texte, en local
+anthropic                # API Claude (le cerveau)
+python-dotenv            # lit la clé API dans le fichier .env
+edge-tts                 # voix neuronales naturelles (gratuites)
+google-api-python-client # accès Gmail
+google-auth-oauthlib     # autorisation Google
+yfinance                 # cours de bourse et cryptos

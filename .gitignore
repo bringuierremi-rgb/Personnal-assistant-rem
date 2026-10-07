@@ -1,0 +1,18 @@
+# Fichiers que Git ne doit JAMAIS envoyer sur GitHub
+
+# Secrets (clé API Anthropic, accès Google)
+.env
+credentials.json
+token_*.json
+
+# Adresses email personnelles
+config_emails.py
+
+# Environnement Python et fichiers générés automatiquement
+.venv/
+__pycache__/
+*.pyc
+
+# Fichiers propres à ce Mac
+.DS_Store
+.dernier_briefing
