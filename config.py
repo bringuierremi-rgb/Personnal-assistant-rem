@@ -39,3 +39,10 @@ GRAVE_VOIX = "-12Hz"
 VITESSE_VOIX = "-10%"
 VITESSE_VOIX = "+5%"
 DUREE_SILENCE = 0.9
+
+# --- Voix féminine (Vivienne) ---
+VOIX_NEURONALE = "fr-FR-VivienneMultilingualNeural"   # voix féminine naturelle (edge-tts)
+GRAVE_VOIX = "+0Hz"            # hauteur naturelle : un réglage grave sonne faux sur une voix féminine
+VOIX = "Amélie"                # voix de secours macOS (féminine) si Internet ne répond pas
+PERSONNALITE += """
+Ta voix est féminine : accorde-toi toujours au féminin quand tu parles de toi ("je suis prête", "ravie de vous aider")."""

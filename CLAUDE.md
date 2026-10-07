@@ -55,7 +55,7 @@ Commandes vocales en session : « briefing » (flash), « briefing complet » (a
 | `cerveau.py` | Claude (API Anthropic) + boucle d'outils + recherche web serveur (`web_search_20260318`, gère `pause_turn`) |
 | `outils.py` | Outils pour Claude : heure, météo, cours, chercher_emails, lire_email |
 | `gmail_outils.py` | Gmail en **lecture seule**, 2 comptes : "perso" et "sci" |
-| `voix.py` / `effets_voix.py` | edge-tts (fr-FR-HenriNeural) + effet « IA » (filtre, résonance, réverb) ; repli sur `say` |
+| `voix.py` / `effets_voix.py` | edge-tts (fr-FR-VivienneMultilingualNeural, voix féminine) + effet « IA » (filtre, résonance, réverb) ; repli sur `say` |
 | `briefing_flash.py` | Briefing court au démarrage + compréhension de la réponse |
 | `briefing.py` | Ancien briefing long (météo, bourse, cryptos + analyse web, emails), en musique |
 | `meteo.py` / `marches.py` | Open-Meteo (requests) / yfinance (cours, historique 1 an mis en cache 1 h) |
@@ -72,7 +72,7 @@ Pour modifier un réglage : changer la ligne, ou ajouter une ligne en fin de `co
 
 Valeurs actuelles notables :
 - `config.py` : SEUIL_SILENCE 179, SEUIL_REVEIL 0.3, DUREE_SILENCE 0.9, EFFET_VOIX "marque",
-  GRAVE_VOIX "-12Hz", VITESSE_VOIX "+5%", MODELE_CLAUDE "claude-sonnet-5-5",
+  VOIX_NEURONALE "fr-FR-VivienneMultilingualNeural", GRAVE_VOIX "+0Hz", VOIX (secours) "Amélie", VITESSE_VOIX "+5%", MODELE_CLAUDE "claude-sonnet-5-5",
   MODELE_WHISPER **"small"** (voir points ouverts).
 - `config_demarrage.py` : SOURCE "apple_music", PLAYLIST "Jarvis", DUREE_MINIMUM 17.
 - `config_reveil.py` : MODE "clap", 2 claps, SENSIBILITE 8.0, NIVEAU_MINIMUM 0.02.
