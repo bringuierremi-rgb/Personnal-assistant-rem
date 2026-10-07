@@ -9,3 +9,5 @@ edge-tts                 # voix neuronales naturelles (gratuites)
 google-api-python-client # accès Gmail
 google-auth-oauthlib     # autorisation Google
 yfinance                 # cours de bourse et cryptos
+requests                 # téléchargement des données météo (meteo.py)
+scipy                    # filtres audio de l'effet de voix « IA » (effets_voix.py)
